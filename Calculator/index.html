@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Average Calculator Microservice</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 500px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    select, button {
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    pre {
+      background: #eee;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 15px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Average Calculator Microservice</h2>
+    <label for="type">Select Number Type:</label>
+    <select id="type">
+      <option value="primes">Prime</option>
+      <option value="fibo">Fibonacci</option>
+      <option value="even">Even</option>
+      <option value="rand">Random</option>
+    </select>
+    <br/>
+    <button onclick="fetchNumbers()">Fetch Numbers</button>
+
+    <pre id="output">Waiting for input...</pre>
+  </div>
+
+  <script>
+    const BEARER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiZXhwIjoxNzQ1MzA4MjQ4LCJpYXQiOjE3NDUzMDc5NDgsImlzcyI6IkFmZm9yZG1lZCIsImp0aSI6IjgzYmRjOWY0LTVkOWUtNDNiZi1hY2MzLTRhMzYwNGZmMmY4NiIsInN1YiI6IjcyNzYyMmJhZDA1NUBtY2V0LmluIn0sImVtYWlsIjoiNzI3NjIyYmFkMDU1QG1jZXQuaW4iLCJuYW1lIjoicmF2ZWVuZGFyIGsiLCJyb2xsTm8iOiI3Mjc2MjJiYWQwNTUiLCJhY2Nlc3NDb2RlIjoianRCdXp1IiwiY2xpZW50SUQiOiI4M2JkYzlmNC01ZDllLTQzYmYtYWNjMy00YTM2MDRmZjJmODYiLCJjbGllbnRTZWNyZXQiOiJZQU53bVhFcWd5a3podE5rIn0.9C4YL7f_4FFrkccBo7v0uORd3HHIDPO5KHT3sCBuXUM";  // 🔒 Replace this with your real Bearer token
+    const BASE_URL = "http://20.244.56.144/evaluation-service/";
+    const CORS_PROXY = "https://corsproxy.io/?"; // public proxy
+
+    const windowSize = 10;
+    let windowCurrState = [];
+    let windowPrevState = [];
+
+    async function fetchNumbers() {
+      const type = document.getElementById("type").value;
+      const url = BASE_URL + type;
+
+      windowPrevState = [...windowCurrState];
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 500);
+
+        const response = await fetch(CORS_PROXY + url, {
+          method: "GET",
+          headers: {
+            "Authorization": "Bearer " + BEARER_TOKEN
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) throw new Error("Failed to fetch");
+
+        const data = await response.json();
+        let fetchedNumbers = data.numbers || [];
+
+        // Remove duplicates
+        fetchedNumbers = fetchedNumbers.filter(num => !windowCurrState.includes(num));
+
+        // Add new numbers
+        windowCurrState.push(...fetchedNumbers);
+
+        // Maintain window size
+        if (windowCurrState.length > windowSize) {
+          windowCurrState = windowCurrState.slice(-windowSize);
+        }
+
+        // Calculate average
+        const avg = (
+          windowCurrState.reduce((sum, val) => sum + val, 0) / 
+          windowCurrState.length
+        ).toFixed(2);
+
+        // Output result
+        document.getElementById("output").textContent = JSON.stringify({
+          windowPrevState,
+          windowCurrState,
+          numbers: fetchedNumbers,
+          avg: parseFloat(avg)
+        }, null, 2);
+
+      } catch (err) {
+        document.getElementById("output").textContent = "Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
